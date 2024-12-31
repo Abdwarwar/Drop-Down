@@ -18,19 +18,23 @@
   class CustomDropdownWidget extends HTMLElement {
     constructor() {
       super();
-      // Temporarily disable Shadow DOM for debugging
       this._root = document.createElement("div");
-      document.body.appendChild(this._root);  // Attach directly to the body for testing
+      document.body.appendChild(this._root); // Attach directly to the body for testing
 
       this._selectedRows = new Set(); // Track selected rows
       this._myDataSource = null;
 
       const addRowButton = document.getElementById("addRowButton");
-      addRowButton.addEventListener("click", () => this.addEmptyRow());
+      if (addRowButton) {
+        addRowButton.addEventListener("click", () => this.addEmptyRow());
+      } else {
+        console.error("Add Row Button not found.");
+      }
     }
 
     connectedCallback() {
-      this.render();
+      console.log('Widget connected callback triggered');
+      setTimeout(() => this.render(), 1000);  // Added a 1-second delay for better initialization
     }
 
     set myDataSource(dataBinding) {
@@ -40,18 +44,16 @@
     }
 
     render() {
+      console.log("Rendering widget...");
       if (!this._myDataSource || this._myDataSource.state !== "success") {
         this._root.innerHTML = `<p>Loading data...</p>`;
-        console.log("Data source is not yet loaded or failed.");
+        console.log("Data source is not loaded or failed.");
         return;
       }
 
-      // Proceed if data is available
-      console.log("Rendering dropdowns...");
       const dimensions = this.getDimensions();
-
       if (dimensions.length === 0) {
-        this._root.innerHTML = `<p>Please add Dimensions in the Builder Panel.</p>`;
+        this._root.innerHTML = `<p>No Dimensions available</p>`;
         console.log("No dimensions available.");
         return;
       }
@@ -95,6 +97,7 @@
     }
 
     async fetchDimensionMembers(dimensionId, returnType = "id") {
+      console.log("Fetching dimension members for:", dimensionId);
       if (!this._myDataSource || !this._myDataSource.data) {
         console.error("Data source or data missing.");
         return [];
