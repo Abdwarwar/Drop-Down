@@ -7,10 +7,9 @@
       .dimension-container { margin: 10px 0; }
       .dimension-label { font-weight: bold; margin-bottom: 5px; }
       select { width: 100%; padding: 5px; }
-      button { margin-bottom: 10px; padding: 5px 10px; cursor: pointer; }
     </style>
     <div id="controls">
-      <button id="addRowButton">Add New Row</button>
+      <!-- Remove "Add New Row" button since it's not needed -->
     </div>
     <div id="root"></div>
   `;
@@ -21,11 +20,7 @@
       this._shadowRoot = this.attachShadow({ mode: "open" });
       this._shadowRoot.appendChild(prepared.content.cloneNode(true));
       this._root = this._shadowRoot.getElementById("root");
-      this._selectedRows = new Set(); // Track selected rows
       this._myDataSource = null;
-
-      const addRowButton = this._shadowRoot.getElementById("addRowButton");
-      addRowButton.addEventListener("click", () => this.addEmptyRow());
     }
 
     connectedCallback() {
@@ -37,7 +32,7 @@
       this.render();
     }
 
-    render() {
+    async render() {
       if (!this._myDataSource || this._myDataSource.state !== "success") {
         this._root.innerHTML = `<p>Loading data...</p>`;
         return;
@@ -55,7 +50,8 @@
       container.style.display = "flex";
       container.style.flexDirection = "column";
 
-      dimensions.forEach((dim) => {
+      // For each dimension, create a dropdown
+      for (const dim of dimensions) {
         const dimensionContainer = document.createElement("div");
         dimensionContainer.classList.add("dimension-container");
 
@@ -65,13 +61,12 @@
         dimensionContainer.appendChild(label);
 
         const dropdown = document.createElement("select");
-        this.fetchDimensionMembers(dim.key, "id").then((members) => {
-          members.forEach((member) => {
-            const option = document.createElement("option");
-            option.value = member.id;
-            option.textContent = member.label;
-            dropdown.appendChild(option);
-          });
+        const members = await this.fetchDimensionMembers(dim.key, "id");  // Ensure members are fetched asynchronously
+        members.forEach((member) => {
+          const option = document.createElement("option");
+          option.value = member.id;
+          option.textContent = member.label;
+          dropdown.appendChild(option);
         });
 
         dropdown.addEventListener("change", (event) => {
@@ -81,7 +76,7 @@
 
         dimensionContainer.appendChild(dropdown);
         container.appendChild(dimensionContainer);
-      });
+      }
 
       this._root.innerHTML = "";
       this._root.appendChild(container);
@@ -115,38 +110,6 @@
         console.error("Error fetching dimension members:", error);
         return [];
       }
-    }
-
-    // Mark this function as async to allow the use of await
-    async addEmptyRow() {
-      const dimensions = this.getDimensions();
-      const newRow = document.createElement("div");
-      newRow.classList.add("dimension-container");
-
-      for (let dim of dimensions) {
-        const cell = document.createElement("div");
-        cell.classList.add("dimension-container");
-
-        const dropdown = document.createElement("select");
-
-        const members = await this.fetchDimensionMembers(dim.key, "id");
-        members.forEach((member) => {
-          const option = document.createElement("option");
-          option.value = member.id;
-          option.textContent = member.label;
-          dropdown.appendChild(option);
-        });
-
-        dropdown.addEventListener("change", (event) => {
-          console.log(`New dimension '${dim.id}' selected as ID: ${event.target.value}`);
-        });
-
-        cell.appendChild(dropdown);
-        newRow.appendChild(cell);
-      }
-
-      this._root.appendChild(newRow);
-      console.log("New row added");
     }
 
     getDimensions() {
