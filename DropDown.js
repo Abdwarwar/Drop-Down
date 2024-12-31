@@ -95,3 +95,4 @@ class DynamicDropdownWidget extends HTMLElement {
 
 // Define the custom element with the name `com-sap-custom-dynamicdropdownwidget`
 customElements.define('com-sap-custom-dynamicdropdownwidget', DynamicDropdownWidget);
+})();
