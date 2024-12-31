@@ -59,14 +59,20 @@
 
         // Populate dropdown with dimension members
         populateDropdown(dropdown, dimension) {
-            // Placeholder for dimension data
-            const members = dimension.members || ['Member 1', 'Member 2', 'Member 3'];
-            dropdown.innerHTML = members.map(member => `<option value="${member}">${member}</option>`).join('');
+            // Fetch members dynamically (replace with SAC model API logic)
+            const members = dimension.members || []; // Ideally, replace with actual fetching logic
+            if (members.length === 0) {
+                dropdown.innerHTML = '<option>No members available</option>';
+            } else {
+                dropdown.innerHTML = members.map(member => `<option value="${member}">${member}</option>`).join('');
+            }
         }
 
         // Set dimensions from SAC model
         setDimensions(dimensions) {
             this.dimensions = dimensions;
+            // Optionally, call addDropdown() to automatically populate with initial dimension data
+            this.addDropdown(); 
         }
     }
 
