@@ -1,4 +1,5 @@
 (function () {
+  console.log('Widget initialized');
   const prepared = document.createElement("template");
   prepared.innerHTML = `
     <style>
@@ -84,6 +85,8 @@
 
       this._root.innerHTML = "";
       this._root.appendChild(container);
+
+      console.log('Rendering dropdowns...');
     }
 
     async fetchDimensionMembers(dimensionId, returnType = "id") {
