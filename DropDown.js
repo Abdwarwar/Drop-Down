@@ -18,13 +18,14 @@
   class CustomDropdownWidget extends HTMLElement {
     constructor() {
       super();
-      this._shadowRoot = this.attachShadow({ mode: "open" });
-      this._shadowRoot.appendChild(prepared.content.cloneNode(true));
-      this._root = this._shadowRoot.getElementById("root");
+      // Temporarily disable Shadow DOM for debugging
+      this._root = document.createElement("div");
+      document.body.appendChild(this._root);  // Attach directly to the body for testing
+
       this._selectedRows = new Set(); // Track selected rows
       this._myDataSource = null;
 
-      const addRowButton = this._shadowRoot.getElementById("addRowButton");
+      const addRowButton = document.getElementById("addRowButton");
       addRowButton.addEventListener("click", () => this.addEmptyRow());
     }
 
@@ -34,18 +35,24 @@
 
     set myDataSource(dataBinding) {
       this._myDataSource = dataBinding;
+      console.log("Data source set:", this._myDataSource);
       this.render();
     }
 
     render() {
       if (!this._myDataSource || this._myDataSource.state !== "success") {
         this._root.innerHTML = `<p>Loading data...</p>`;
+        console.log("Data source is not yet loaded or failed.");
         return;
       }
 
+      // Proceed if data is available
+      console.log("Rendering dropdowns...");
       const dimensions = this.getDimensions();
+
       if (dimensions.length === 0) {
         this._root.innerHTML = `<p>Please add Dimensions in the Builder Panel.</p>`;
+        console.log("No dimensions available.");
         return;
       }
 
@@ -85,13 +92,11 @@
 
       this._root.innerHTML = "";
       this._root.appendChild(container);
-
-      console.log('Rendering dropdowns...');
     }
 
     async fetchDimensionMembers(dimensionId, returnType = "id") {
       if (!this._myDataSource || !this._myDataSource.data) {
-        console.error("Data source not available or data is missing.");
+        console.error("Data source or data missing.");
         return [];
       }
 
