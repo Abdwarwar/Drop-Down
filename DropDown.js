@@ -1,68 +1,218 @@
-sap.ui.define([
-    "sap/ui/core/mvc/Controller",
-    "sap/m/Select",
-    "sap/m/SelectListItem"
-], function (Controller, Select, SelectListItem) {
-    "use strict";
+(function () {
+  const prepared = document.createElement("template");
+  prepared.innerHTML = `
+    <style>
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background-color: #f4f4f4; }
+      tr:nth-child(even) { background-color: #f9f9f9; }
+      tr.selected { background-color: #ffeb3b; }
+      td.editable { background-color: #fff3e0; }
+      button { margin-bottom: 10px; padding: 5px 10px; cursor: pointer; }
+    </style>
+    <div id="controls">
+      <button id="addRowButton">Add New Row</button>
+    </div>
+    <div id="root" style="width: 100%; height: 100%; overflow: auto;"></div>
+  `;
 
-    return Controller.extend("com.sap.custom.dynamicdropdownwidget", {
+  class CustomTableWidget extends HTMLElement {
+    constructor() {
+      super();
+      this._shadowRoot = this.attachShadow({ mode: "open" });
+      this._shadowRoot.appendChild(prepared.content.cloneNode(true));
+      this._root = this._shadowRoot.getElementById("root");
+      this._selectedRows = new Set();
+      this._myDataSource = null;
 
-        /**
-         * This method is called to create the dropdowns dynamically based on the provided dimensions.
-         * @param {Array} dimensions Array of dimension names to create dropdowns for
-         */
-        createDropdowns: function (dimensions) {
-            var oContainer = this.getView().byId("dropdownContainer"); // The container for the dropdowns
-            oContainer.destroyItems(); // Clear previous dropdowns
+      const addRowButton = this._shadowRoot.getElementById("addRowButton");
+      addRowButton.addEventListener("click", () => this.addEmptyRow());
+    }
 
-            // Loop through each dimension to create a dropdown
-            dimensions.forEach(function (dimension) {
-                var oDropdown = new Select({
-                    width: "100%",
-                    change: this._onDropdownChange.bind(this), // Event handler for changes
-                    selectedKey: ""
-                });
+    connectedCallback() {
+      this.render();
+    }
 
-                // Get the model and fetch members for this dimension
-                var oModel = this.getView().getModel(); // Retrieve the model
-                if (oModel) {
-                    // Assuming the members for each dimension are stored under "/<dimension>/members"
-                    var aMembers = oModel.getProperty("/" + dimension + "/members");
+    set myDataSource(dataBinding) {
+      this._myDataSource = dataBinding;
+      this.render();
+    }
 
-                    // Add the members to the dropdown
-                    if (aMembers && aMembers.length > 0) {
-                        aMembers.forEach(function (member) {
-                            oDropdown.addItem(new SelectListItem({
-                                text: member.name,  // Display name of the member
-                                key: member.key     // Unique key for the member
-                            }));
-                        });
-                    }
-                }
+    render() {
+      if (!this._myDataSource || this._myDataSource.state !== "success") {
+        this._root.innerHTML = `<p>Loading data...</p>`;
+        return;
+      }
 
-                // Add the dropdown to the container
-                oContainer.addItem(oDropdown);
-            }, this);
-        },
+      const dimensions = this.getDimensions();
+      const measures = this.getMeasures();
 
-        /**
-         * Event handler for when a dropdown value is selected.
-         * @param {sap.ui.base.Event} oEvent Event object for the change event
-         */
-        _onDropdownChange: function (oEvent) {
-            var oSelect = oEvent.getSource();
-            var selectedKey = oSelect.getSelectedKey();
-            console.log("Selected Key: " + selectedKey);  // Log the selected value (you can handle this as needed)
-        },
+      if (dimensions.length === 0 || measures.length === 0) {
+        this._root.innerHTML = `<p>Please add Dimensions and Measures in the Builder Panel.</p>`;
+        return;
+      }
 
-        /**
-         * Public method to set the dimensions and trigger the creation of dropdowns.
-         * @param {Array} dimensions Array of dimension names to create dropdowns for
-         */
-        setDimensions: function (dimensions) {
-            if (Array.isArray(dimensions) && dimensions.length > 0) {
-                this.createDropdowns(dimensions); // Call the method to create dropdowns dynamically
+      const tableData = this._myDataSource.data.map((row, index) => ({
+        index,
+        ...dimensions.reduce((acc, dim) => {
+          acc[dim.id] = row[dim.key]?.label || row[dim.key]?.id || "N/A";
+          return acc;
+        }, {}),
+        ...measures.reduce((acc, measure) => {
+          acc[measure.id] = row[measure.key]?.raw || row[measure.key]?.formatted || "N/A";
+          return acc;
+        }, {}),
+      }));
+
+      const container = document.createElement("div");
+      container.style.display = "flex";
+      container.style.flexDirection = "column";
+
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <thead>
+          <tr>
+            ${dimensions.map((dim) => `<th>${dim.description || dim.id}</th>`).join("")}
+            ${measures.map((measure) => `<th>${measure.description || measure.id}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${tableData
+            .map(
+              (row) =>
+                `<tr data-row-index="${row.index}">
+                  ${dimensions.map((dim) => `<td>${row[dim.id]}</td>`).join("")}
+                  ${measures
+                    .map(
+                      (measure) =>
+                        `<td class="editable" data-measure-id="${measure.id}">${row[measure.id]}</td>`
+                    )
+                    .join("")}
+                </tr>`
+            )
+            .join("")}
+        </tbody>
+      `;
+      container.appendChild(table);
+      this._root.innerHTML = "";
+      this._root.appendChild(container);
+
+      this.attachRowSelectionListeners();
+      this.makeMeasureCellsEditable();
+    }
+
+    attachRowSelectionListeners() {
+      const rows = this._root.querySelectorAll("tbody tr");
+      rows.forEach((row) => {
+        row.addEventListener("click", (event) => {
+          const rowIndex = event.currentTarget.getAttribute("data-row-index");
+          if (this._selectedRows.has(rowIndex)) {
+            this._selectedRows.delete(rowIndex);
+            event.currentTarget.classList.remove("selected");
+          } else {
+            this._selectedRows.add(rowIndex);
+            event.currentTarget.classList.add("selected");
+          }
+        });
+      });
+    }
+
+    makeMeasureCellsEditable() {
+      const rows = this._root.querySelectorAll("tbody tr");
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll("td.editable");
+        cells.forEach((cell) => {
+          const measureId = cell.getAttribute("data-measure-id");
+          cell.contentEditable = "false";
+          cell.addEventListener("dblclick", () => {
+            cell.contentEditable = "true";
+            cell.focus();
+          });
+
+          cell.addEventListener("blur", (event) => {
+            const newValue = parseFloat(cell.textContent.trim());
+            cell.contentEditable = "false";
+            if (!isNaN(newValue)) {
+              const measureKey = this.getMeasures().find((measure) => measure.id === measureId)?.key;
+              this._myDataSource.data[row.index][measureKey] = { raw: newValue };
             }
+          });
+        });
+      });
+    }
+
+    async addEmptyRow() {
+      const table = this._root.querySelector("table tbody");
+      const dimensions = this.getDimensions();
+      const measures = this.getMeasures();
+      const newRowIndex = table.rows.length;
+
+      const newRow = document.createElement("tr");
+      newRow.setAttribute("data-row-index", newRowIndex);
+
+      dimensions.forEach((dim) => {
+        const cell = document.createElement("td");
+        const dropdown = document.createElement("select");
+
+        const members = await this.fetchDimensionMembers(dim.key);
+        members.forEach((member) => {
+          const option = document.createElement("option");
+          option.value = member.id;
+          option.textContent = member.label;
+          dropdown.appendChild(option);
+        });
+
+        dropdown.addEventListener("change", (event) => {
+          cell.setAttribute("data-dimension-value", event.target.value);
+        });
+
+        cell.appendChild(dropdown);
+        newRow.appendChild(cell);
+      });
+
+      measures.forEach((measure) => {
+        const cell = document.createElement("td");
+        cell.classList.add("editable");
+        cell.setAttribute("data-measure-id", measure.id);
+        cell.contentEditable = "true";
+        newRow.appendChild(cell);
+      });
+
+      newRow.addEventListener("click", () => {
+        this._selectedRows.add(newRowIndex);
+      });
+
+      table.appendChild(newRow);
+    }
+
+    async fetchDimensionMembers(dimensionId) {
+      if (!this._myDataSource) return [];
+
+      const membersSet = new Set();
+      this._myDataSource.data.forEach((row) => {
+        const value = row[dimensionId]?.id || row[dimensionId]?.label;
+        if (value) {
+          membersSet.add(value);
         }
-    });
-});
+      });
+
+      return Array.from(membersSet).map((member) => ({ id: member, label: member }));
+    }
+
+    getDimensions() {
+      return this._myDataSource.metadata.feeds.dimensions.values.map((key) => {
+        const dimension = this._myDataSource.metadata.dimensions[key];
+        return { id: key, description: dimension.description || key };
+      });
+    }
+
+    getMeasures() {
+      return this._myDataSource.metadata.feeds.measures.values.map((key) => {
+        const measure = this._myDataSource.metadata.mainStructureMembers[key];
+        return { id: key, description: measure.description || key };
+      });
+    }
+  }
+
+  customElements.define("custom-table-widget", CustomTableWidget);
+})();
