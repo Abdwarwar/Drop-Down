@@ -18,43 +18,34 @@
   class CustomDropdownWidget extends HTMLElement {
     constructor() {
       super();
-      this._root = document.createElement("div");
-      document.body.appendChild(this._root); // Attach directly to the body for testing
-
+      this._shadowRoot = this.attachShadow({ mode: "open" });
+      this._shadowRoot.appendChild(prepared.content.cloneNode(true));
+      this._root = this._shadowRoot.getElementById("root");
       this._selectedRows = new Set(); // Track selected rows
       this._myDataSource = null;
 
-      const addRowButton = document.getElementById("addRowButton");
-      if (addRowButton) {
-        addRowButton.addEventListener("click", () => this.addEmptyRow());
-      } else {
-        console.error("Add Row Button not found.");
-      }
+      const addRowButton = this._shadowRoot.getElementById("addRowButton");
+      addRowButton.addEventListener("click", () => this.addEmptyRow());
     }
 
     connectedCallback() {
-      console.log('Widget connected callback triggered');
-      setTimeout(() => this.render(), 1000);  // Added a 1-second delay for better initialization
+      this.render();
     }
 
     set myDataSource(dataBinding) {
       this._myDataSource = dataBinding;
-      console.log("Data source set:", this._myDataSource);
       this.render();
     }
 
     render() {
-      console.log("Rendering widget...");
       if (!this._myDataSource || this._myDataSource.state !== "success") {
         this._root.innerHTML = `<p>Loading data...</p>`;
-        console.log("Data source is not loaded or failed.");
         return;
       }
 
       const dimensions = this.getDimensions();
       if (dimensions.length === 0) {
-        this._root.innerHTML = `<p>No Dimensions available</p>`;
-        console.log("No dimensions available.");
+        this._root.innerHTML = `<p>Please add Dimensions in the Builder Panel.</p>`;
         return;
       }
 
@@ -94,12 +85,13 @@
 
       this._root.innerHTML = "";
       this._root.appendChild(container);
+
+      console.log('Rendering dropdowns...');
     }
 
     async fetchDimensionMembers(dimensionId, returnType = "id") {
-      console.log("Fetching dimension members for:", dimensionId);
       if (!this._myDataSource || !this._myDataSource.data) {
-        console.error("Data source or data missing.");
+        console.error("Data source not available or data is missing.");
         return [];
       }
 
@@ -125,12 +117,13 @@
       }
     }
 
+    // Mark this function as async to allow the use of await
     async addEmptyRow() {
       const dimensions = this.getDimensions();
       const newRow = document.createElement("div");
       newRow.classList.add("dimension-container");
 
-      dimensions.forEach((dim) => {
+      for (let dim of dimensions) {
         const cell = document.createElement("div");
         cell.classList.add("dimension-container");
 
@@ -150,7 +143,7 @@
 
         cell.appendChild(dropdown);
         newRow.appendChild(cell);
-      });
+      }
 
       this._root.appendChild(newRow);
       console.log("New row added");
