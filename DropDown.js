@@ -1,149 +1,68 @@
-// SAC Custom Widget for Dynamic Dropdown Filters
-(function() {
-    const template = document.createElement('template');
-    template.innerHTML = `
-        <style>
-            .dropdown-container {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
+sap.ui.define([
+    "sap/ui/core/mvc/Controller",
+    "sap/m/Select",
+    "sap/m/SelectListItem"
+], function (Controller, Select, SelectListItem) {
+    "use strict";
+
+    return Controller.extend("com.sap.custom.dynamicdropdownwidget", {
+
+        /**
+         * This method is called to create the dropdowns dynamically based on the provided dimensions.
+         * @param {Array} dimensions Array of dimension names to create dropdowns for
+         */
+        createDropdowns: function (dimensions) {
+            var oContainer = this.getView().byId("dropdownContainer"); // The container for the dropdowns
+            oContainer.destroyItems(); // Clear previous dropdowns
+
+            // Loop through each dimension to create a dropdown
+            dimensions.forEach(function (dimension) {
+                var oDropdown = new Select({
+                    width: "100%",
+                    change: this._onDropdownChange.bind(this), // Event handler for changes
+                    selectedKey: ""
+                });
+
+                // Get the model and fetch members for this dimension
+                var oModel = this.getView().getModel(); // Retrieve the model
+                if (oModel) {
+                    // Assuming the members for each dimension are stored under "/<dimension>/members"
+                    var aMembers = oModel.getProperty("/" + dimension + "/members");
+
+                    // Add the members to the dropdown
+                    if (aMembers && aMembers.length > 0) {
+                        aMembers.forEach(function (member) {
+                            oDropdown.addItem(new SelectListItem({
+                                text: member.name,  // Display name of the member
+                                key: member.key     // Unique key for the member
+                            }));
+                        });
+                    }
+                }
+
+                // Add the dropdown to the container
+                oContainer.addItem(oDropdown);
+            }, this);
+        },
+
+        /**
+         * Event handler for when a dropdown value is selected.
+         * @param {sap.ui.base.Event} oEvent Event object for the change event
+         */
+        _onDropdownChange: function (oEvent) {
+            var oSelect = oEvent.getSource();
+            var selectedKey = oSelect.getSelectedKey();
+            console.log("Selected Key: " + selectedKey);  // Log the selected value (you can handle this as needed)
+        },
+
+        /**
+         * Public method to set the dimensions and trigger the creation of dropdowns.
+         * @param {Array} dimensions Array of dimension names to create dropdowns for
+         */
+        setDimensions: function (dimensions) {
+            if (Array.isArray(dimensions) && dimensions.length > 0) {
+                this.createDropdowns(dimensions); // Call the method to create dropdowns dynamically
             }
-            .dropdown {
-                padding: 5px;
-                font-size: 14px;
-            }
-            button {
-                margin-top: 10px;
-                padding: 5px 10px;
-                background-color: #0078d7;
-                color: white;
-                border: none;
-                border-radius: 3px;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #005a9e;
-            }
-        </style>
-        <div class="dropdown-container">
-            <button id="addDropdown">Add Dropdown</button>
-        </div>
-    `;
-
-class CustomDropdownWidget extends HTMLElement {
-  constructor() {
-    super();
-    this._shadowRoot = this.attachShadow({ mode: "open" });
-    this._root = document.createElement("div");
-    this._shadowRoot.appendChild(this._root);
-
-    this._selectedRows = new Set(); // Track selected rows
-    this._myDataSource = null; // Placeholder for data source
-  }
-
-  connectedCallback() {
-    this.render();
-  }
-
-  set myDataSource(dataBinding) {
-    this._myDataSource = dataBinding;
-    this.render();
-  }
-
-  render() {
-    if (!this._myDataSource || this._myDataSource.state !== "success") {
-      this._root.innerHTML = "<p>Loading data...</p>";
-      return;
-    }
-
-    const dimensions = this.getDimensions();
-
-    if (dimensions.length === 0) {
-      this._root.innerHTML = "<p>No dimensions available in data.</p>";
-      return;
-    }
-
-    const table = document.createElement("table");
-    const headerRow = document.createElement("tr");
-
-    // Create a header for each dimension
-    dimensions.forEach((dim) => {
-      const th = document.createElement("th");
-      th.textContent = dim.description || dim.id;
-      headerRow.appendChild(th);
-    });
-
-    table.appendChild(headerRow);
-
-    // Add rows with dropdowns for dimensions
-    for (let rowIndex = 0; rowIndex < 5; rowIndex++) { // Example: 5 rows of dropdowns
-      const row = document.createElement("tr");
-      dimensions.forEach((dim) => {
-        const cell = document.createElement("td");
-
-        const dropdown = document.createElement("select");
-        this.fetchDimensionMembers(dim.id).then((members) => {
-          members.forEach((member) => {
-            const option = document.createElement("option");
-            option.value = member.id;
-            option.textContent = member.label;
-            dropdown.appendChild(option);
-          });
-        });
-
-        cell.appendChild(dropdown);
-        row.appendChild(cell);
-      });
-
-      table.appendChild(row);
-    }
-
-    this._root.innerHTML = "";
-    this._root.appendChild(table);
-  }
-
-  async fetchDimensionMembers(dimensionId) {
-    if (!this._myDataSource || !this._myDataSource.data) {
-      console.error("Data source or data missing.");
-      return [];
-    }
-
-    try {
-      const membersSet = new Set();
-      this._myDataSource.data.forEach((row) => {
-        const value = row[dimensionId]?.id || null;
-        if (value) {
-          membersSet.add(value);
         }
-      });
-
-      return Array.from(membersSet).map((member) => ({
-        id: member,
-        label: member,
-      }));
-    } catch (error) {
-      console.error("Error fetching dimension members:", error);
-      return [];
-    }
-  }
-
-  getDimensions() {
-    if (!this._myDataSource || !this._myDataSource.metadata) {
-      console.error("Data source metadata missing.");
-      return [];
-    }
-
-    const dimensionKeys = this._myDataSource.metadata.feeds.dimensions.values;
-    return dimensionKeys.map((key) => {
-      const dimension = this._myDataSource.metadata.dimensions[key];
-      return dimension ? {
-        id: dimension.id || key,
-        description: dimension.description || key,
-      } : { id: key, description: key };
     });
-  }
-}
-
-
-    customElements.define('dynamic-dropdown-widget', DynamicDropdownWidget);
-})();
+});
