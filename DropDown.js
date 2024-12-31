@@ -4,7 +4,13 @@
   const prepared = document.createElement("template");
   prepared.innerHTML = `
     <style>
-      #root { display: flex; align-items: center; justify-content: center; height: 100%; }
+      #root { 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        height: 100%; 
+        width: 100%;
+      }
     </style>
     <div id="root">Hello World</div>
   `;
@@ -22,5 +28,10 @@
     }
   }
 
-  customElements.define("custom-hello-world-widget", CustomHelloWorldWidget);
+  try {
+    customElements.define("custom-hello-world-widget", CustomHelloWorldWidget);
+    console.log("Widget custom element defined successfully.");
+  } catch (error) {
+    console.error("Error defining the custom element:", error);
+  }
 })();
