@@ -16,90 +16,65 @@
     <div id="root" style="width: 100%; height: 100%; overflow: auto;"></div>
   `;
 
-  class CustomTableWidget extends HTMLElement {
-    constructor() {
-      super();
-      this._shadowRoot = this.attachShadow({ mode: "open" });
-      this._shadowRoot.appendChild(prepared.content.cloneNode(true));
-      this._root = this._shadowRoot.getElementById("root");
-      this._selectedRows = new Set();
-      this._myDataSource = null;
+  class DynamicDropdownWidget extends HTMLElement {
+     constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.widgetData = {}; // Store widget properties and data
+  }
 
-      const addRowButton = this._shadowRoot.getElementById("addRowButton");
-      addRowButton.addEventListener("click", () => this.addEmptyRow());
-    }
+  connectedCallback() {
+    this.render();
+    this.addListeners();
+  }
 
-    connectedCallback() {
-      this.render();
-    }
+    set dimensions(value) {
+    // This will update the dimensions array from the JSON
+    this.widgetData.dimensions = value;
+    this.render();
+  }
+
+    set members(value) {
+    // This will update the members mapping from the JSON
+    this.widgetData.members = value;
+    this.render();
+  }
 
     set myDataSource(dataBinding) {
       this._myDataSource = dataBinding;
       this.render();
     }
 
-    render() {
-      if (!this._myDataSource || this._myDataSource.state !== "success") {
-        this._root.innerHTML = `<p>Loading data...</p>`;
-        return;
-      }
+  render() {
+    const { dimensions, members } = this.widgetData;
+    const container = document.createElement('div');
+    container.style.width = this.getAttribute('width') + 'px';
+    container.style.height = this.getAttribute('height') + 'px';
 
-      const dimensions = this.getDimensions();
-      const measures = this.getMeasures();
+    // Create dropdowns dynamically based on the dimensions
+    dimensions.forEach((dimension, index) => {
+      const select = document.createElement('select');
+      const dimensionMembers = members[index] || [];
 
-      if (dimensions.length === 0 || measures.length === 0) {
-        this._root.innerHTML = `<p>Please add Dimensions and Measures in the Builder Panel.</p>`;
-        return;
-      }
+      dimensionMembers.forEach((member) => {
+        const option = document.createElement('option');
+        option.value = member;
+        option.innerText = member;
+        select.appendChild(option);
+      });
 
-      const tableData = this._myDataSource.data.map((row, index) => ({
-        index,
-        ...dimensions.reduce((acc, dim) => {
-          acc[dim.id] = row[dim.key]?.label || row[dim.key]?.id || "N/A";
-          return acc;
-        }, {}),
-        ...measures.reduce((acc, measure) => {
-          acc[measure.id] = row[measure.key]?.raw || row[measure.key]?.formatted || "N/A";
-          return acc;
-        }, {}),
-      }));
+      select.addEventListener('change', (event) => {
+        this.dispatchEvent(new CustomEvent('onSelectionChange', { detail: event.target.value }));
+      });
 
-      const container = document.createElement("div");
-      container.style.display = "flex";
-      container.style.flexDirection = "column";
+      const label = document.createElement('label');
+      label.innerText = dimension;
+      container.appendChild(label);
+      container.appendChild(select);
+    });
 
-      const table = document.createElement("table");
-      table.innerHTML = `
-        <thead>
-          <tr>
-            ${dimensions.map((dim) => `<th>${dim.description || dim.id}</th>`).join("")}
-            ${measures.map((measure) => `<th>${measure.description || measure.id}</th>`).join("")}
-          </tr>
-        </thead>
-        <tbody>
-          ${tableData
-            .map(
-              (row) =>
-                `<tr data-row-index="${row.index}">
-                  ${dimensions.map((dim) => `<td>${row[dim.id]}</td>`).join("")}
-                  ${measures
-                    .map(
-                      (measure) =>
-                        `<td class="editable" data-measure-id="${measure.id}">${row[measure.id]}</td>`
-                    )
-                    .join("")}
-                </tr>`
-            )
-            .join("")}
-        </tbody>
-      `;
-      container.appendChild(table);
-      this._root.innerHTML = "";
-      this._root.appendChild(container);
-
-      this.attachRowSelectionListeners();
-      this.makeMeasureCellsEditable();
-    }
+    this.shadowRoot.appendChild(container);
+  }
 
     attachRowSelectionListeners() {
       const rows = this._root.querySelectorAll("tbody tr");
@@ -214,5 +189,5 @@
     }
   }
 
-  customElements.define("custom-table-widget", CustomTableWidget);
+  customElements.define("com-sap-custom-dynamicdropdownwidget", DynamicDropdownWidget);
 })();
